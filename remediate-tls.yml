@@ -1,0 +1,182 @@
+---
+- name: Automated TLS certificate remediation
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    gateway_host: "13.71.185.105"
+    tls_server_name: "incident-api.local"
+
+    resource_group: "rg-prod-api-incident-lab"
+    application_gateway: "appgw-incident-lab"
+    certificate_name: "incident-api-cert"
+
+    key_vault_name: "kv-incident-api-lab"
+    key_vault_secret_name: "incident-api-pfx-password"
+
+    warning_days: 30
+
+    tls_directory: "/home/kemal/tls-incident-lab"
+
+    new_key: "{{ tls_directory }}/incident-api-auto.key"
+    new_cert: "{{ tls_directory }}/incident-api-auto.crt"
+    new_pfx: "{{ tls_directory }}/incident-api-auto.pfx"
+
+  tasks:
+
+    # ---------------------------------------------------------
+    # Detect current production certificate state
+    # ---------------------------------------------------------
+
+    - name: Get current production certificate expiry
+      ansible.builtin.shell: |
+        echo | openssl s_client \
+          -connect {{ gateway_host }}:443 \
+          -servername {{ tls_server_name }} 2>/dev/null |
+        openssl x509 -noout -enddate |
+        cut -d= -f2
+      register: cert_expiry
+      changed_when: false
+
+    - name: Calculate certificate days remaining
+      ansible.builtin.shell: |
+        EXPIRY_EPOCH=$(date -d "{{ cert_expiry.stdout }}" +%s)
+        NOW_EPOCH=$(date +%s)
+        echo $(( (EXPIRY_EPOCH - NOW_EPOCH) / 86400 ))
+      register: days_remaining
+      changed_when: false
+
+    - name: Display current certificate status
+      ansible.builtin.debug:
+        msg: >-
+          Current TLS certificate expires on {{ cert_expiry.stdout }}
+          and has {{ days_remaining.stdout }} days remaining.
+
+    # ---------------------------------------------------------
+    # Remediation path
+    # ---------------------------------------------------------
+
+    - name: Remediate expiring TLS certificate
+      when: days_remaining.stdout | int <= warning_days | int
+      block:
+
+        - name: Retrieve PFX password from Azure Key Vault
+          ansible.builtin.command:
+            argv:
+              - az
+              - keyvault
+              - secret
+              - show
+              - --vault-name
+              - "{{ key_vault_name }}"
+              - --name
+              - "{{ key_vault_secret_name }}"
+              - --query
+              - value
+              - -o
+              - tsv
+          register: keyvault_pfx_password
+          changed_when: false
+          no_log: true
+
+        - name: Generate replacement private key and certificate
+          ansible.builtin.command:
+            argv:
+              - openssl
+              - req
+              - -x509
+              - -newkey
+              - rsa:2048
+              - -sha256
+              - -days
+              - "365"
+              - -nodes
+              - -keyout
+              - "{{ new_key }}"
+              - -out
+              - "{{ new_cert }}"
+              - -subj
+              - "/CN={{ tls_server_name }}"
+
+        - name: Read replacement certificate expiry
+          ansible.builtin.shell: |
+            openssl x509 \
+              -in {{ new_cert }} \
+              -noout \
+              -enddate |
+            cut -d= -f2
+          register: replacement_expiry
+          changed_when: false
+
+        - name: Display replacement certificate expiry
+          ansible.builtin.debug:
+            msg: "Replacement certificate expires: {{ replacement_expiry.stdout }}"
+
+        - name: Create replacement PFX
+          ansible.builtin.command:
+            argv:
+              - openssl
+              - pkcs12
+              - -export
+              - -out
+              - "{{ new_pfx }}"
+              - -inkey
+              - "{{ new_key }}"
+              - -in
+              - "{{ new_cert }}"
+              - -passout
+              - "pass:{{ keyvault_pfx_password.stdout }}"
+          no_log: true
+
+        - name: Update Application Gateway certificate
+          ansible.builtin.command:
+            argv:
+              - az
+              - network
+              - application-gateway
+              - ssl-cert
+              - update
+              - --resource-group
+              - "{{ resource_group }}"
+              - --gateway-name
+              - "{{ application_gateway }}"
+              - --name
+              - "{{ certificate_name }}"
+              - --cert-file
+              - "{{ new_pfx }}"
+              - --cert-password
+              - "{{ keyvault_pfx_password.stdout }}"
+          no_log: true
+
+        - name: Wait until Application Gateway serves replacement certificate
+          ansible.builtin.shell: |
+            echo | openssl s_client \
+              -connect {{ gateway_host }}:443 \
+              -servername {{ tls_server_name }} 2>/dev/null |
+            openssl x509 -noout -enddate |
+            cut -d= -f2
+          register: new_expiry
+          changed_when: false
+          retries: 12
+          delay: 5
+          until: new_expiry.stdout == replacement_expiry.stdout
+
+        - name: Display remediation result
+          ansible.builtin.debug:
+            msg: >-
+              Certificate remediation completed successfully.
+              Live Application Gateway certificate expiry:
+              {{ new_expiry.stdout }}
+
+    # ---------------------------------------------------------
+    # Healthy path
+    # ---------------------------------------------------------
+
+    - name: No remediation required
+      ansible.builtin.debug:
+        msg: >-
+          Certificate is healthy.
+          {{ days_remaining.stdout }} days remain.
+          No remediation required.
+      when: days_remaining.stdout | int > warning_days | int

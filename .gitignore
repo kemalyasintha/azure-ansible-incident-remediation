@@ -1,0 +1,47 @@
+# SSH private keys
+*.pem
+*.key
+id_rsa
+id_rsa.*
+incident_lab_key
+incident_lab_key.*
+
+# TLS certificates / generated artifacts
+*.pfx
+*.p12
+
+# Generated certificate artifacts
+incident-api-auto.crt
+incident-api-auto.key
+incident-api-auto.pfx
+
+# Ansible temporary/retry files
+*.retry
+.ansible/
+
+# Environment files / secrets
+.env
+.env.*
+secrets.yml
+vault-password.txt
+
+# OS/editor files
+.DS_Store
+*.swp
+*.tmp
+
+# Backups
+*.bak
+*~
+
+# Local working/backup files
+remediate-tls-working.yml
+warning_days
+
+# Build/deployment artifacts
+artifacts/
+
+# Local environment-specific Ansible inventory
+inventory.ini
+remediate-tls-before-keyvault.yml
+remediate-tls-env-backup.yml

@@ -1,0 +1,14 @@
+[Unit]
+Description=Incident Lab ASP.NET Core API
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/incident-api
+ExecStart=/usr/bin/dotnet /opt/incident-api/IncidentApi.dll
+Restart=always
+RestartSec=5
+User=azureuser
+Environment=ASPNETCORE_ENVIRONMENT=Production
+
+[Install]
+WantedBy=multi-user.target

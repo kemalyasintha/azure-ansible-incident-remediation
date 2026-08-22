@@ -1,0 +1,91 @@
+---
+- name: Configure API backend server
+  hosts: vm-api-linux02
+  become: true
+
+  tasks:
+    - name: Update apt package cache
+      ansible.builtin.apt:
+        update_cache: true
+
+    - name: Install Nginx
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+
+    - name: Install ASP.NET Core 8 runtime
+      ansible.builtin.apt:
+        name: aspnetcore-runtime-8.0
+        state: present
+
+    - name: Create API directory
+      ansible.builtin.file:
+        path: /opt/incident-api
+        state: directory
+        owner: azureuser
+        group: azureuser
+        mode: '0755'
+
+    - name: Deploy API files
+      ansible.builtin.copy:
+        src: artifacts/incident-api/
+        dest: /opt/incident-api/
+        owner: azureuser
+        group: azureuser
+        mode: preserve
+
+    - name: Deploy systemd service
+      ansible.builtin.template:
+        src: templates/incident-api.service.j2
+        dest: /etc/systemd/system/incident-api.service
+        mode: '0644'
+
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Enable and start Incident API
+      ansible.builtin.systemd:
+        name: incident-api
+        enabled: true
+        state: restarted
+
+    - name: Deploy Nginx reverse proxy configuration
+      ansible.builtin.template:
+        src: templates/incident-api-nginx.j2
+        dest: /etc/nginx/sites-available/incident-api
+        mode: '0644'
+
+    - name: Enable Incident API Nginx site
+      ansible.builtin.file:
+        src: /etc/nginx/sites-available/incident-api
+        dest: /etc/nginx/sites-enabled/incident-api
+        state: link
+        force: true
+
+    - name: Remove default Nginx site
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Validate Nginx configuration
+      ansible.builtin.command:
+        cmd: nginx -t
+      changed_when: false
+
+    - name: Reload Nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: reloaded
+        enabled: true
+
+    - name: Verify health endpoint
+      ansible.builtin.uri:
+        url: http://localhost/health
+        status_code: 200
+        return_content: true
+      register: health_result
+
+    - name: Show health response
+      ansible.builtin.debug:
+        var: health_result.content

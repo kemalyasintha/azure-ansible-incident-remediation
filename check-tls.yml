@@ -1,0 +1,42 @@
+---
+- name: Check production TLS certificate
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    gateway_host: "13.71.185.105"
+    tls_server_name: "incident-api.local"
+    warning_days: 30
+
+  tasks:
+    - name: Get certificate expiry date
+      ansible.builtin.shell: |
+        echo | openssl s_client \
+          -connect {{ gateway_host }}:443 \
+          -servername {{ tls_server_name }} 2>/dev/null |
+        openssl x509 -noout -enddate |
+        cut -d= -f2
+      register: cert_expiry
+      changed_when: false
+
+    - name: Display certificate expiry
+      ansible.builtin.debug:
+        msg: "Production certificate expires: {{ cert_expiry.stdout }}"
+
+    - name: Check certificate expiration threshold
+      ansible.builtin.shell: |
+        EXPIRY_EPOCH=$(date -d "{{ cert_expiry.stdout }}" +%s)
+        NOW_EPOCH=$(date +%s)
+        echo $(( (EXPIRY_EPOCH - NOW_EPOCH) / 86400 ))
+      register: days_remaining
+      changed_when: false
+
+    - name: Show days remaining
+      ansible.builtin.debug:
+        msg: "TLS certificate has {{ days_remaining.stdout }} days remaining"
+
+    - name: Raise certificate warning
+      ansible.builtin.debug:
+        msg: "WARNING: TLS certificate expires within {{ warning_days }} days!"
+      when: days_remaining.stdout | int <= warning_days
