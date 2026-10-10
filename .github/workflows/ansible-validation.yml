@@ -9,6 +9,32 @@ on:
       - main
 
 jobs:
+  compliance-evidence:
+    name: Validate synthetic compliance evidence
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test workflow and rejection cases
+        run: python -m unittest discover -s tests -v
+      - name: Run local compliance demonstration
+        run: python scripts/compliance_workflow.py run --input examples/compliance/scenario.json --output artifacts/compliance-demo --as-of 2026-10-10
+      - name: Verify evidence bundle
+        run: python scripts/compliance_workflow.py verify --output artifacts/compliance-demo --as-of 2026-10-10
+      - name: Retain demonstration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-compliance-evidence
+          path: artifacts/compliance-demo/
+          if-no-files-found: error
+          retention-days: 14
   ansible-validation:
     name: Validate Ansible Playbooks
     runs-on: ubuntu-latest

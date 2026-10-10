@@ -40,6 +40,8 @@ warning_days
 
 # Build/deployment artifacts
 artifacts/
+__pycache__/
+*.pyc
 
 # Local environment-specific Ansible inventory
 inventory.ini
