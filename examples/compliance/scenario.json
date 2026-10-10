@@ -1,0 +1,83 @@
+{
+  "scope": "synthetic-local-demo",
+  "change": {
+    "id": "CHG-DEMO-001",
+    "status": "approved",
+    "requester": "demo-operator",
+    "approver": "demo-change-reviewer",
+    "approved_at": "2026-10-10T08:00:00Z",
+    "execution_at": "2026-10-10T09:00:00Z",
+    "reason": "Restore the declared reverse-proxy backend port after simulated drift",
+    "risk": "Incorrect upstream configuration can prevent requests reaching the API",
+    "rollback": "Restore config-before.txt in the local demo. For a live run, restore a reviewed known-good configuration and recheck health.",
+    "expected_configuration": "proxy_pass http://127.0.0.1:5000;\n",
+    "observed_configuration": "proxy_pass http://127.0.0.1:5001;\n"
+  },
+  "incident": {
+    "id": "INC-DEMO-001",
+    "change_id": "CHG-DEMO-001",
+    "owner": "demo-operator",
+    "root_cause": "Simulated manual change replaced the declared backend port",
+    "impact": "A live reverse proxy with this configuration would fail to reach the backend",
+    "mitigation": "Restore the reviewed declared configuration and compare file contents",
+    "preventive_action": "Review configuration changes and retain before-and-after verification evidence"
+  },
+  "access": [
+    {
+      "user": "demo-support-user",
+      "role": "Reader",
+      "manager": "demo-support-manager",
+      "reviewer": "demo-support-manager",
+      "decision": "retain",
+      "justification": "Active support assignment requires read access",
+      "reviewed_at": "2026-10-10T08:15:00Z"
+    },
+    {
+      "user": "demo-former-contractor",
+      "role": "Contributor",
+      "manager": "demo-vendor-manager",
+      "reviewer": "demo-vendor-manager",
+      "decision": "revoke",
+      "justification": "Synthetic contract ended; access is no longer required",
+      "reviewed_at": "2026-10-10T08:20:00Z"
+    }
+  ],
+  "findings": [
+    {
+      "id": "FIND-DEMO-001",
+      "asset": "local-proxy-config",
+      "severity": "high",
+      "owner": "demo-operator",
+      "description": "Configuration drift from the declared upstream port",
+      "status": "closed",
+      "due_date": "2026-10-11",
+      "remediation": "Restore declared port through CHG-DEMO-001",
+      "verification": "Compare config-after.txt with the declared configuration"
+    },
+    {
+      "id": "FIND-DEMO-002",
+      "asset": "synthetic-linux-package",
+      "severity": "medium",
+      "owner": "demo-patch-owner",
+      "description": "Illustrative patch finding, not scanner output or a real CVE",
+      "status": "open",
+      "due_date": "2026-10-31",
+      "remediation": "Schedule a reviewed patch change and record verification"
+    },
+    {
+      "id": "FIND-DEMO-003",
+      "asset": "isolated-demo-endpoint",
+      "severity": "low",
+      "owner": "demo-operator",
+      "description": "Illustrative temporary lab exception",
+      "status": "exception",
+      "due_date": "2026-10-11",
+      "remediation": "Remove the exception after the planned lab change",
+      "exception": {
+        "approver": "demo-risk-reviewer",
+        "reason": "Temporary isolated demonstration with synthetic data",
+        "expires": "2026-10-20"
+      }
+    }
+  ]
+}

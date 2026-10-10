@@ -316,13 +316,25 @@ Implemented and tested:
 - Live certificate verification
 - Git source control
 
-## Next Steps
+## Compliance evidence extension
+
+The repository now includes a local, executable demonstration of recorded change approvals, incident evidence, synthetic-user access reviews, local access revocation, and a patch/vulnerability register. It generates evidence files with SHA-256 hashes and rejects missing or modified evidence, overdue unresolved findings and expired exceptions.
+
+```bash
+python scripts/compliance_workflow.py run --input examples/compliance/scenario.json --output artifacts/compliance-demo --as-of 2026-10-10
+python scripts/compliance_workflow.py verify --output artifacts/compliance-demo --as-of 2026-10-10
+python -m unittest discover -s tests -v
+```
+
+See [the workflow, evidence inventory, procedures and UAT cases](docs/compliance-workflow.md). All new access-review and finding data is synthetic. The extension repairs a local configuration file; it does not run a vulnerability scanner, revoke real Azure access, execute a live Ansible remediation or establish regulatory compliance. It requires no Azure credits. GitHub Actions runs the acceptance tests and retains generated evidence artifacts.
+
+## Further improvements
 
 Planned improvements include:
 
-- GitHub Actions validation
 - Ansible linting
-- Automated syntax checks
-- CI quality gates
+- Authenticated approvals and real access-system integration
+- Live scanner imports with controlled finding reconciliation
+- Signed or independently retained evidence manifests
 - Architecture documentation
 - Additional incident-remediation scenarios
